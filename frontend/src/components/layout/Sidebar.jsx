@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import ConfirmModal from "./ConfirmModal";
+import { useAuth } from "../../context/AuthContext";
+import ConfirmModal from "../common/ConfirmModal";
 
 const menuItems = [
   {
@@ -66,7 +66,14 @@ export default function Sidebar({ isOpen, onClose }) {
         {menuItems.map((item) => (
           <button
             key={item.path}
-            onClick={() => handleNavigate(item.path)}
+            onClick={() => {
+              if (!user && item.path === "/mypage") {
+                navigate("/login");
+                onClose?.();
+              } else {
+                handleNavigate(item.path);
+              }
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
               ${location.pathname === item.path
                 ? "bg-indigo-50 text-indigo-600"
