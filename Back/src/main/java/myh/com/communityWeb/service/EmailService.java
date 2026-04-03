@@ -1,14 +1,12 @@
 package myh.com.communityWeb.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -16,18 +14,15 @@ import java.util.concurrent.TimeUnit;
 public class EmailService {
 
     private final JavaMailSender mailSender;
-
-    // 이메일 : 인증코드 임시 저장 (5분 후 자동 삭제)
-    private final Map<String, String> codeStore = new ConcurrentHashMap<>();
+    private final StringRedisTemplate redisTemplate; // ← ConcurrentHashMap 대신!
 
     // 6자리 인증코드 생성 및 발송
     public void sendVerificationCode(String email) {
         String code = String.format("%06d", (int)(Math.random() * 1000000));
-        codeStore.put(email, code);
 
-        // 5분 후 자동 삭제
-        Executors.newSingleThreadScheduledExecutor()
-                .schedule(() -> codeStore.remove(email), 5, TimeUnit.MINUTES);
+        // Redis에 저장 (5분 후 자동 삭제)
+        redisTemplate.opsForValue()
+                .set("emailCode:" + email, code, 5, TimeUnit.MINUTES);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -53,9 +48,9 @@ public class EmailService {
 
     // 코드 검증
     public boolean verifyCode(String email, String code) {
-        String stored = codeStore.get(email);
+        String stored = redisTemplate.opsForValue().get("emailCode:" + email);
         if (stored != null && stored.equals(code)) {
-            codeStore.remove(email); // 인증 완료 후 삭제
+            redisTemplate.delete("emailCode:" + email); // 인증 완료 후 삭제
             return true;
         }
         return false;
